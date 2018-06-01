@@ -1,6 +1,7 @@
 {
     "name": "botnyx/tm-oauthmiddleware",
-    "license": "MIT",
+    "minimum-stability": "dev",
+	"type":"library",
     "require": {
         "php": "^5.6 || ^7.0"
     },
