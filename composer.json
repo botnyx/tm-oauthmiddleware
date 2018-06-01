@@ -1,14 +1,9 @@
 {
     "name": "botnyx/tm-oauthmiddleware",
     "autoload": {
-        "psr-4": {
-			"botnyx\\tmoauthmiddleware\\": "src"
-
-		}
+        "psr-4": {"botnyx\\tmoauthmiddleware\\": "src"}	
 	},
     "require": {
         "php": ">=7.0"
     }
-    
-    
 }
