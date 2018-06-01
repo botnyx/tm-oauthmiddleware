@@ -7,8 +7,7 @@ namespace botnyx\tmoauthmiddleware;
 use Slim\Http\Request;
 use Slim\Http\Response;
 
-
-
+// $z = new \botnyx\tmoauthmiddleware\oauthmiddleware($server,$clientid,$clientsecret,$jwt_public_key)
 
 class oauthmiddleware {
     
@@ -23,7 +22,7 @@ class oauthmiddleware {
 		$this->server	=$server;
 		$this->client_id=$clientid;
 		$this->client_secret=$clientsecret;
-		$this->jwt_public_key=$jwt_public_key;// '/home/myaccount/src/accounts.trustmaster.pub.key'
+		$this->jwt_public_key=$jwt_public_key;
 	}
 	
 	/**
@@ -81,7 +80,7 @@ class oauthmiddleware {
 		
 		#$response->getBody()->write('BEFORE');
         $response = $next($request, $response);
-        #$response->getBody()->write('AFTER');
+        $response->getBody()->write('AFTER');
 
 		
         return $response;
