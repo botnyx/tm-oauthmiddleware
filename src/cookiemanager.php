@@ -15,7 +15,7 @@ class cookiemanager {
 	
 	var $payload = [];
 
-	
+	var $debug = true;
 	
 	function __construct($server,$clientid,$clientsecret,$jwt_public_key){
 
@@ -46,10 +46,20 @@ class cookiemanager {
 	
 	public function verify(){
 		if(!$this->checkJsCookie()){
+			if($this->debug) error_log("No js cookie.");
 			if(!$this->checkSecureCookie()){
+				if($this->debug) error_log("no other cookies.");
+				
 				return false;//echo "Not logged in!";
+			}else{
+				// set the non-httponly cookies again... in case they get lost.
+				$this->setJavascriptCookie("SID",$this->access_token,$this->payload->exp);
+				$this->setJavascriptCookie("EAT",$this->payload->exp,$this->payload->exp);
+
 			}
 		}
+		if($this->debug) error_log("Authenticated user");
+			
 		return true;
 	}
 	
@@ -146,12 +156,10 @@ class cookiemanager {
 	
 	private function exchangeRefreshToken($refreshtoken){
 		
-		#echo "exchange refreshtoken<br>";
-		$server= "https://idp.trustmaster.nl";
-		$clientid= "accounts.trustmaster";
-		$clientsecret= "test123";
+		if($this->debug) error_log("exchange refreshtoken");
 		
-		$idp = new \botnyx\tmidpconn\idpconn($server,$clientid,$clientsecret);
+		
+		$idp = new \botnyx\tmidpconn\idpconn($this->server,$this->client_id,$this->client_secret);
 		
 		$resp = $idp->getRefreshToken($refreshtoken);
 		
@@ -159,6 +167,8 @@ class cookiemanager {
 			
 			if( $this->verifyJWT($resp['data']['access_token'])){
 				// jwt is ok, setcookie.
+				if($this->debug) error_log("JWT validated, setcookies! ");
+
 				$this->setNewCookies($resp['data']);
 				return true;
 			}else{
@@ -167,6 +177,8 @@ class cookiemanager {
 			}
 			
 		}
+		if($this->debug) error_log("renew token responded: ".$resp['code']);
+		
 		
 		
 		return false;
@@ -178,12 +190,18 @@ class cookiemanager {
 		
 		$this->accessToken =$resp['access_token'];
 		$this->setHttpOnlyCookie("SSID",$resp['access_token'],$this->payload->exp);
-
+		$this->ssid_expires = $this->payload->exp;
+		
 		$this->setJavascriptCookie("SID",$resp['access_token'],$this->payload->exp);
+		$this->sid_expires = $this->payload->exp;
+		
 		$this->setJavascriptCookie("EAT",$this->payload->exp,$this->payload->exp);
 
 		$this->refreshToken =$resp['refresh_token'];
 		$this->setHttpOnlyCookie("SRID",$resp['refresh_token'],time()+2419200);
+		$this->setHttpOnlyCookie("SREAT",time()+2419200,time()+2419200);
+		
+		$this->srid_expires = time()+2419200;
 		
 	}
 	

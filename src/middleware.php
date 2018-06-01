@@ -16,7 +16,7 @@ class oauthmiddleware {
 	var $client_secret;
 	var $jwt_public_key;
 	
-	
+	var $callback;
 	
 	function __construct($server,$clientid,$clientsecret,$jwt_public_key){
 		$this->server	=$server;
@@ -36,21 +36,28 @@ class oauthmiddleware {
      */
     public function __invoke($request, $response, $next)
     {
-        $cookieMan = new \cookiemanager($this->server,$this->clientid,$this->clientsecret,$this->jwt_public_key);
+        $cookieMan = new cookiemanager($this->server,$this->client_id,$this->client_secret,$this->jwt_public_key);
 		
 		$redirect = false;
+		$authenticated = false;
+		
+		echo "<pre>";
 		
 		// verify the request
 		if(!$cookieMan->verify()){
 			//  anon, or invalid token.
+			echo "anon, or invalid token.\n";
 			if(!in_array('anon',$this->scopes)){
 				// anon is not allowed, do something.
 				$redirect = true;
-				$redirectUrl = "http://accounts.trustmaster.nl/signin?ref=".urlencode($cookieMan->requestedUrl);
+				$redirectUrl = urlencode($cookieMan->requestedUrl);
 			}
 			
 		}else{
 			// authenticated user details.
+			echo "authenticated user details.\n";
+			
+			$authenticated =  true;
 			$cookieMan->payload->sub;
 			$cookieMan->payload->exp;
 			$cookieMan->payload->aud;
@@ -61,9 +68,8 @@ class oauthmiddleware {
 			
 		}
 		
-		#echo "<pre>";
-		#print_r($oA->payload->scope);
-		#print_r($oA);
+		
+		print_r($cookieMan);
 		
 		#print_r($this->scopes);
 		//$this->scopes;
