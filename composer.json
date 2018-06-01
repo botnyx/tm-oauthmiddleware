@@ -2,7 +2,7 @@
     "name": "botnyx/tm-oauthmiddleware",
     "autoload": {
         "psr-4": {
-			"botnyx\\tmoauthmiddleware\\" : "src"
+			"botnyx\\tmoauthmiddleware\\": "src"
 
 		}
 	},
