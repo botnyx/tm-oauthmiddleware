@@ -1,10 +1,11 @@
 {
     "name": "botnyx/slim-oauthmiddleware",
-	"description": "none",
     "autoload": {
-        "psr-4": {"botnyx\\tmoauthmiddleware\\": "src"}	
+        "psr-4" : {
+			"botnyx\\tmoauthmiddleware\\" : "src"
+		}	
 	},
     "require": {
-        "php": ">=7.0"
+       "php": ">=7.0"
     }
 }
