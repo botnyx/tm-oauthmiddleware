@@ -9,12 +9,20 @@ use Slim\Http\Response;
 
 // $z = new \botnyx\tmoauthmiddleware\oauthmiddleware($server,$clientid,$clientsecret,$jwt_public_key)
 
+//https://api.mysite.com/authorize?response_type=code&client_id=TestClient&redirect_uri=https://myredirecturi.com/cb
+
+
 class oauthmiddleware {
     
-	var $server;
-	var $client_id;
-	var $client_secret;
-	var $jwt_public_key;
+	var $server; 		// http://idp.trustmaster.nl
+	var $authorize_uri;	// /authorize
+	
+	// 
+	var $callback_uri;  // /callback
+	
+	var $client_id;		//
+	var $client_secret;	//
+	var $jwt_public_key;// /somelocation/pub.key
 	
 	var $callback;
 	
@@ -68,9 +76,13 @@ class oauthmiddleware {
 			
 		}
 		
+		$cookieMan->client_id="redacted";
+		$cookieMan->client_secret="redacted";
+		//print_r($cookieMan);
 		
-		print_r($cookieMan);
+		#$container = $this->getContainer();
 		
+		#var_dump($container);
 		#print_r($this->scopes);
 		//$this->scopes;
 		#echo "</pre>";
@@ -86,11 +98,15 @@ class oauthmiddleware {
 		
 		#$response->getBody()->write('BEFORE');
         $response = $next($request, $response);
-        $response->getBody()->write('AFTER');
+		//$response = $response->withHeader('Access-Control-Allow-Origin', '*');
+		
+		#$response->getBody()->write('AFTER');
 
+		$response->cookieMan = $cookieMan;
 		
         return $response;
     }
+	
 	
 	/**
      * Returns a callable function to be used as a authorization middleware with a specified scope.

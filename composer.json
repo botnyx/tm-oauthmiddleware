@@ -4,6 +4,7 @@
         "psr-4": {"botnyx\\tmoauthmiddleware\\": "src"}	
 	},
     "require": {
-        "php": ">=7.0"
+        "php": ">=7.0",
+		"botnyx/tm-idpconn": "dev-master"
     }
 }
