@@ -1,10 +1,9 @@
 {
-    "name": "botnyx/tm-oauthmiddleware",
+    "name": "botnyx/slim-oauthmiddleware",
     "autoload": {
         "psr-4": {"botnyx\\tmoauthmiddleware\\": "src"}	
 	},
     "require": {
-        "php": ">=7.0",
-		"botnyx/tm-idpconn": "dev-master"
+        "php": ">=7.0"
     }
 }
