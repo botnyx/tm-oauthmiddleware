@@ -9,20 +9,12 @@ use Slim\Http\Response;
 
 // $z = new \botnyx\tmoauthmiddleware\oauthmiddleware($server,$clientid,$clientsecret,$jwt_public_key)
 
-//https://api.mysite.com/authorize?response_type=code&client_id=TestClient&redirect_uri=https://myredirecturi.com/cb
-
-
-class oauthmiddleware {
+class middleware {
     
-	var $server; 		// http://idp.trustmaster.nl
-	var $authorize_uri;	// /authorize
-	
-	// 
-	var $callback_uri;  // /callback
-	
-	var $client_id;		//
-	var $client_secret;	//
-	var $jwt_public_key;// /somelocation/pub.key
+	var $server;
+	var $client_id;
+	var $client_secret;
+	var $jwt_public_key;
 	
 	var $callback;
 	
@@ -106,7 +98,6 @@ class oauthmiddleware {
 		
         return $response;
     }
-	
 	
 	/**
      * Returns a callable function to be used as a authorization middleware with a specified scope.
