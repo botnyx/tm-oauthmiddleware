@@ -9,12 +9,20 @@ use Slim\Http\Response;
 
 // $z = new \botnyx\tmoauthmiddleware\oauthmiddleware($server,$clientid,$clientsecret,$jwt_public_key)
 
+//https://api.mysite.com/authorize?response_type=code&client_id=TestClient&redirect_uri=https://myredirecturi.com/cb
+
+
 class middleware {
     
-	var $server;
-	var $client_id;
-	var $client_secret;
-	var $jwt_public_key;
+	var $server; 		// http://idp.trustmaster.nl
+	var $authorize_uri;	// /authorize
+	
+	// 
+	var $callback_uri = "/callback";  // /callback
+	
+	var $client_id;		//
+	var $client_secret;	//
+	var $jwt_public_key;// /somelocation/pub.key
 	
 	var $callback;
 	
@@ -24,6 +32,8 @@ class middleware {
 		$this->client_secret=$clientsecret;
 		$this->jwt_public_key=$jwt_public_key;
 	}
+	
+	
 	
 	/**
      * Example middleware invokable class
@@ -36,7 +46,32 @@ class middleware {
      */
     public function __invoke($request, $response, $next)
     {
-        $cookieMan = new cookiemanager($this->server,$this->client_id,$this->client_secret,$this->jwt_public_key);
+        //  check if url has ?code=
+		$allGetVars = $request->getQueryParams();
+		
+		//Single GET parameter
+		//$code = $allGetVars['code'];
+		
+		
+		
+		
+		$cookieMan = new cookiemanager($this->server,$this->client_id,$this->client_secret,$this->jwt_public_key);
+		
+		#$r = $request->getUri()->getQuery();
+		$r = $request->getUri()->getPath();
+		
+		if( $r==$this->callback_uri){
+			//var_dump($r);
+			if(array_key_exists('code',$allGetVars)){
+				try{
+					$cookieMan->receiveAuthCode($allGetVars['code']);				
+				}catch(Exception $e){
+					var_dump($e->getMessage());
+					die($e->getMessage());			
+				}
+
+			}
+		}
 		
 		$redirect = false;
 		$authenticated = false;
@@ -50,7 +85,7 @@ class middleware {
 			if(!in_array('anon',$this->scopes)){
 				// anon is not allowed, do something.
 				$redirect = true;
-				$redirectUrl = urlencode($cookieMan->requestedUrl);
+				$redirectUrl = $cookieMan->requestedUrl;
 			}
 			
 		}else{
@@ -63,13 +98,14 @@ class middleware {
 			$cookieMan->payload->aud;
 			$cookieMan->payload->scope;
 			
+			$cookieMan->client_id="redacted";
+			$cookieMan->client_secret="redacted";
+			
 			$cookieMan->refreshToken;
 			$cookieMan->accessToken;
-			
+			print_r($cookieMan);
 		}
 		
-		$cookieMan->client_id="redacted";
-		$cookieMan->client_secret="redacted";
 		//print_r($cookieMan);
 		
 		#$container = $this->getContainer();
@@ -79,10 +115,16 @@ class middleware {
 		//$this->scopes;
 		#echo "</pre>";
 
+		$endpoint = "https://idp.trustmaster.nl/authorize".
+		"?response_type=code&client_id=".$cookieMan->client_id."&state=".time();//."&redirect_uri=".$redirectUrl;
 		
 
+			
+		
+		
+		
 		if($redirect){
-			return $response->withRedirect('https://accounts.trustmaster.nl/signin?ref='.$redirectUrl, 301);
+			return $response->withRedirect($endpoint, 301);
 		}
 		
 		
@@ -94,10 +136,10 @@ class middleware {
 		
 		#$response->getBody()->write('AFTER');
 
-		$response->cookieMan = $cookieMan;
 		
         return $response;
     }
+	
 	
 	/**
      * Returns a callable function to be used as a authorization middleware with a specified scope.
