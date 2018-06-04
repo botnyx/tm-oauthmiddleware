@@ -3,7 +3,7 @@
 
 namespace botnyx\tmoauthmiddleware;
 
-
+use ArrayAccess;
 use Slim\Http\Request;
 use Slim\Http\Response;
 
@@ -26,11 +26,13 @@ class middleware {
 	
 	var $callback;
 	
-	function __construct($server,$clientid,$clientsecret,$jwt_public_key){
+	function __construct($server,$clientid,$clientsecret,$jwt_public_key,$container){
 		$this->server	=$server;
 		$this->client_id=$clientid;
 		$this->client_secret=$clientsecret;
 		$this->jwt_public_key=$jwt_public_key;
+		
+		$this->container = $this->validateContainer($container);
 	}
 	
 	
@@ -76,12 +78,12 @@ class middleware {
 		$redirect = false;
 		$authenticated = false;
 		
-		echo "<pre>";
+		//echo "<pre>";
 		
 		// verify the request
 		if(!$cookieMan->verify()){
 			//  anon, or invalid token.
-			echo "anon, or invalid token.\n";
+			//echo "anon, or invalid token.\n";
 			if(!in_array('anon',$this->scopes)){
 				// anon is not allowed, do something.
 				$redirect = true;
@@ -90,7 +92,7 @@ class middleware {
 			
 		}else{
 			// authenticated user details.
-			echo "authenticated user details.\n";
+			//echo "authenticated user details.\n";
 			
 			$authenticated =  true;
 			$cookieMan->payload->sub;
@@ -103,7 +105,20 @@ class middleware {
 			
 			$cookieMan->refreshToken;
 			$cookieMan->accessToken;
-			print_r($cookieMan);
+			
+			
+			$rezz = array(	"refresh_token"=>$cookieMan->refreshToken,
+						  	"access_token"=>$cookieMan->accessToken,
+						  	"exp"=>$cookieMan->payload->exp,
+						  	"aud"=>$cookieMan->payload->aud,
+						  	"sub"=>$cookieMan->payload->sub,
+						  	"scope"=>$cookieMan->payload->scope
+						 );
+			
+			$this->setToken($rezz);
+			
+			//print_r($rezz);
+			
 		}
 		
 		//print_r($cookieMan);
@@ -140,6 +155,37 @@ class middleware {
         return $response;
     }
 	
+	
+    private function validateContainer($container)
+    {
+        if (is_a($container, ArrayAccess::class)) {
+            return $container;
+        }
+
+        if (method_exists($container, 'set')) {
+            return $container;
+        }
+
+        throw new \InvalidArgumentException("\$container does not implement ArrayAccess or contain a 'set' method");
+    }
+	
+	
+	 /**
+     * Helper method to set the token value in the container instance.
+     *
+     * @param array $token The token from the incoming request.
+     *
+     * @return void
+     */
+    private function setToken(array $token)
+    {
+        if (is_a($this->container, '\\ArrayAccess')) {
+            $this->container['token'] = $token;
+            return;
+        }
+
+        $this->container->set('token', $token);
+    }
 	
 	/**
      * Returns a callable function to be used as a authorization middleware with a specified scope.
