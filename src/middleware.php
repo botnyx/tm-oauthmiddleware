@@ -115,7 +115,7 @@ class middleware {
 		//$this->scopes;
 		#echo "</pre>";
 
-		$endpoint = "https://idp.trustmaster.nl/authorize".
+		$endpoint = "https://accounts.trustmaster.nl/authorize".
 		"?response_type=code&client_id=".$cookieMan->client_id."&state=".time();//."&redirect_uri=".$redirectUrl;
 		
 
