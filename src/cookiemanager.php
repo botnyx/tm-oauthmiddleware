@@ -50,20 +50,24 @@ class cookiemanager {
 	}
 	
 	public function receiveAuthCode($code){
-		if($this->debug) {
-			error_log("receiveCode(): Exchange code for token");
-			echo " cookiemanager->receiveAuthCode($code)";
-		}
+		#if($this->debug) {
+		//	error_log("receiveCode(): Exchange code for token");
+		#	echo " cookiemanager->receiveAuthCode($code)";
+		#}
 		echo "<pre>";
 		#var_dump($this->client_id);
 		#var_dump($this->client_secret);
-		#var_dump($this->server);
+		$this->server= "https://idp.trustmaster.nl";
+		var_dump($this->server);
 		#var_dump($code);
+		
 		$idp = new \botnyx\tmidpconn\idpconn($this->server,$this->client_id,$this->client_secret);
 		
-		$result = $idp->receiveAuthCode($code );
 		
+		$result = $idp->receiveAuthCode($code );
+		#var_dump($result);
 		if($result['code']!=200){
+			var_dump($result);
 			#$result['code'];
 			#$result['data']['error'];
 			#$result['data']['error_description'];
@@ -76,9 +80,9 @@ class cookiemanager {
 				if($this->debug) error_log("JWT validated, setcookies! ");
 
 				$this->setNewCookies($result['data']);
-				print_r($result);
-				print_r($this->payload);
-				die();
+				#print_r($result);
+				#print_r($this->payload);
+				#die();
 				return true;
 			}else{
 				// jwt decoding failed!
