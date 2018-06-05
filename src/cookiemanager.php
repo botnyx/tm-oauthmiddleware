@@ -13,28 +13,27 @@ class cookiemanager {
 	var $refreshToken;
 	var $accessToken;
 	
-	var $cookiedomain;
-	
 	var $payload = [];
 
-	var $debug = true;
+	var $debug = false;
 	
 	function __construct($server,$clientid,$clientsecret,$jwt_public_key){
 
 		$this->server	=$server;
 		$this->client_id=$clientid;
 		$this->client_secret=$clientsecret;
-		$this->cookiedomain = $_SERVER['HTTP_HOST'];
-		
-		
 		if(!file_exists($jwt_public_key)){
 			throw new \Exception("public key not found! ".$jwt_public_key);
 		}
 		$this->jwt_public_key=$jwt_public_key;
-	
+		
+		
+		$this->cookiedomain = $_SERVER['HTTP_HOST'];
+		
+		
 		//$this->init();
 		if(!isset($_COOKIE['CONSENT'])) {
-			error_log("Visitor hasnt set the consent!");
+			//error_log("Visitor hasnt set the consent!");
 			//S+NL.nl+V9
 		}
 		
@@ -48,62 +47,6 @@ class cookiemanager {
 
 		
 	}
-	
-	public function receiveAuthCode($code){
-		#if($this->debug) {
-		//	error_log("receiveCode(): Exchange code for token");
-		#	echo " cookiemanager->receiveAuthCode($code)";
-		#}
-		echo "<pre>";
-		#var_dump($this->client_id);
-		#var_dump($this->client_secret);
-		$this->server= "https://idp.trustmaster.nl";
-		var_dump($this->server);
-		#var_dump($code);
-		
-		$idp = new \botnyx\tmidpconn\idpconn($this->server,$this->client_id,$this->client_secret);
-		
-		
-		$result = $idp->receiveAuthCode($code );
-		#var_dump($result);
-		if($result['code']!=200){
-			var_dump($result);
-			#$result['code'];
-			#$result['data']['error'];
-			#$result['data']['error_description'];
-			return false;
-		}else{
-			
-			
-			if( $this->verifyJWT($result['data']['access_token'])){
-				// jwt is ok, setcookie.
-				if($this->debug) error_log("JWT validated, setcookies! ");
-
-				$this->setNewCookies($result['data']);
-				#print_r($result);
-				#print_r($this->payload);
-				#die();
-				return true;
-			}else{
-				// jwt decoding failed!
-				return false;
-			}
-			
-			
-			#$result['code'];
-			#$result['data']['access_token'];
-			#$result['data']['expires_in'];		
-			#$result['data']['token_type'];		
-			#$result['data']['scope'];		
-			#$result['data']['refresh_token'];		
-		}
-		
-		
-		
-		
-		
-	}
-	
 	
 	public function verify(){
 		if(!$this->checkJsCookie()){
@@ -247,7 +190,65 @@ class cookiemanager {
 	}
 	
 	
-	private function setNewCookies($resp){
+	public function receiveAuthCode($code){
+		#if($this->debug) {
+		//	error_log("receiveCode(): Exchange code for token");
+		#	echo " cookiemanager->receiveAuthCode($code)";
+		#}
+		echo "<pre>";
+		#var_dump($this->client_id);
+		#var_dump($this->client_secret);
+		$this->server= "https://idp.trustmaster.nl";
+		var_dump($this->server);
+		#var_dump($code);
+		
+		$idp = new \botnyx\tmidpconn\idpconn($this->server,$this->client_id,$this->client_secret);
+		
+		
+		$result = $idp->receiveAuthCode($code );
+		#var_dump($result);
+		if($result['code']!=200){
+			var_dump($result);
+			#$result['code'];
+			#$result['data']['error'];
+			#$result['data']['error_description'];
+			return false;
+		}else{
+			
+			
+			if( $this->verifyJWT($result['data']['access_token'])){
+				// jwt is ok, setcookie.
+				if($this->debug) error_log("JWT validated, setcookies! ");
+
+				$this->setNewCookies($result['data']);
+				#print_r($result);
+				#print_r($this->payload);
+				#die();
+				return true;
+			}else{
+				// jwt decoding failed!
+				return false;
+			}
+			
+			
+			#$result['code'];
+			#$result['data']['access_token'];
+			#$result['data']['expires_in'];		
+			#$result['data']['token_type'];		
+			#$result['data']['scope'];		
+			#$result['data']['refresh_token'];		
+		}
+		
+		
+		
+		
+		
+	}
+	
+	
+	
+	
+	public function setNewCookies($resp){
 		
 		$this->accessToken =$resp['access_token'];
 		$this->setHttpOnlyCookie("SSID",$resp['access_token'],$this->payload->exp);
@@ -295,7 +296,7 @@ class cookiemanager {
 	
 
 	
-	private function verifyJWT($jwt_access_token){
+	public function verifyJWT($jwt_access_token){
 		
 		//$token = json_decode($curlResponse);
 

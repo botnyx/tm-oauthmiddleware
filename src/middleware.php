@@ -15,10 +15,9 @@ use Slim\Http\Response;
 class middleware {
     
 	var $server; 		// http://idp.trustmaster.nl
-	var $authorize_uri;	// /authorize
-	
-	// 
+	var $authorize_uri= '/authorize';	// /authorize
 	var $callback_uri = "/callback";  // /callback
+	
 	
 	var $client_id;		//
 	var $client_secret;	//
@@ -27,12 +26,17 @@ class middleware {
 	var $callback;
 	
 	function __construct($server,$clientid,$clientsecret,$jwt_public_key,$container){
+		
 		$this->server	=$server;
 		$this->client_id=$clientid;
 		$this->client_secret=$clientsecret;
 		$this->jwt_public_key=$jwt_public_key;
 		
 		$this->container = $this->validateContainer($container);
+		
+		// start a new cookiemanager.
+		$this->cookieMan = new cookiemanager($this->server,$this->client_id,$this->client_secret,$this->jwt_public_key);
+		
 	}
 	
 	
@@ -48,32 +52,349 @@ class middleware {
      */
     public function __invoke($request, $response, $next)
     {
-        //  check if url has ?code=
+        
 		$allGetVars = $request->getQueryParams();
+		$allPostPutVars = $request->getParsedBody();
+		$allUrlVars = $request->getQueryParams();
+		
+		
+		$url_path = $request->getUri()->getPath();
+		$method = $request->getMethod();
+			
+		
+		$isAuthenticated = $this->cookieMan->verify();
+		
+		
+
+		
+		
+		echo "<pre>This page (".$_SERVER['SCRIPT_URI'].") needs at least one of these scopes.\n";
+		print_r($this->scopes);
+		echo "\n";
+
+		
+		if( !in_array('anon',$this->scopes) && !$isAuthenticated && $url_path!=$this->authorize_uri ){
+			// Anonymous access is not allowed.
+			// in a normal oauth situation we should be redirected to the authorisation endpoint.
+			error_log("middleware: "."ANON NOT ALLOWED!");
+			
+			if($isAuthenticated){
+				echo "You are authenticated!\n";
+			}else{
+				echo "You are NOT loggedin!\n";
+			}
+			
+			$redirectUrl = $_SERVER['SCRIPT_URI'];
+			echo "PROTECTED URL : ".$redirectUrl."\n";
+			$_SESSION['lastUrl']= $redirectUrl;
+			
+			
+			$endpoint = "https://accounts.trustmaster.nl/authorize?response_type=code&client_id=".$this->client_id."&state=".time()."&redirect_uri=".$redirectUrl;
+			echo "REDIRECT:\n<a href='".$endpoint."'>".$endpoint."</a>";
+			die();
+			//return $response->withRedirect($endpoint, 302);
+		}
+		
+		
+		// Authorize URL
+		if( $url_path==$this->authorize_uri){
+			echo "middleware: "."We are at the AUTHORIZE URI\n";
+			$authorizeRoute = new \botnyx\tmoauthmiddleware\authorize($request);
+			
+			echo "Referred via :".$_SESSION['lastUrl']."\n";
+			
+			
+			$idp = new \botnyx\tmidpconn\idpconn($this->server,$this->client_id,$this->client_secret);
+			
+			
+			if($isAuthenticated){
+				echo "You are authenticated!\n";
+				
+				
+				if($method!='POST'){
+					echo "present Grant Auth screen\n";
+					return $this->container['view']->render($response, 'base-layout.phtml', [
+						'screen' => 'authorize',
+						'data'=>array('client_id'=>$this->client_id),
+						'error'=>''
+					]);	
+				}else{
+					echo "receive GrantScreen data via post.";
+					print_r($allPostPutVars);
+					
+						
+					
+					#print_r($this->cookieMan);
+					#$this->cookieMan->payload->aud
+					
+					$R = $idp->receiveAuthCode(strtolower($allPostPutVars['authorized']),$this->cookieMan->payload->aud,$this->cookieMan->payload->sub);
+					
+					
+					if($R['code']==302){
+						// YES we have a redirect!
+						$R['data']['code'];
+						$R['data']['state'];
+						$R['data']['url'];
+						$parsedUrl = parse_url($R['data']['url']);
+						var_dump($parsedUrl);
+
+
+						parse_str($parsedUrl['query'], $idp_response);
+						var_dump($idp_response);
+						
+						$uri = $R['data']['url']."&redirect_uri=".$_SESSION['lastUrl'];
+						
+						
+						echo "<a href='$uri'>REDIR!</a>";
+						die();
+						return $response->withRedirect($uri, 301);
+						
+						
+					}else{
+						$R['data']['error'];
+						$R['data']['error_description'];
+						
+						
+					}
+					//print_r($R);
+					die();
+					
+					
+					
+					
+					
+					die();
+				}
+				
+				
+				
+				
+				
+
+			}else{
+				echo "You are NOT loggedin!\n";
+				echo "present LOGIN screen\n";
+				echo $method."\n";
+				if($method=='POST'){
+					//$authorizeRoute->login();
+					echo "Referred via :".$_SESSION['lastUrl']."\n";
+					
+					$r = $idp->oauthLogin($allPostPutVars['TMinputEmail']."@trustmaster.nl",$allPostPutVars['TMinputPassword']);
+					if($r['code']==200){
+						// OK!
+						// Doublecheck by verifying the the JWT token. 
+						if(!$this->cookieMan->verifyJWT($r['data']['access_token']) ){
+							echo "Something terrible happened, jwt didnt pass verification!\n";
+							die();
+						}
+						
+						echo "We are authenticated! set cookies!\n";
+						$this->cookieMan->setNewCookies($r['data']);
+						
+						
+						echo "\nREDIRECT:\n<a href='https://accounts.trustmaster.nl".$_SERVER['REQUEST_URI']."'>".$_SERVER['REQUEST_URI']."</a>";
+						die();
+						return $response->withRedirect($_SERVER['REQUEST_URI'], 301);
+						
+						#var_dump($_SERVER['REQUEST_URI']);
+						#print_r($r);
+						#die();
+					}else{
+						// nok!
+						return $this->container['view']->render($response, 'base-layout.phtml', [
+							'screen' => 'signin',
+							'error'=>$r
+						]);	
+					}
+					
+					
+					
+					
+				}else{
+					return $this->container['view']->render($response, 'base-layout.phtml', [
+						'screen' => 'signin'
+					]);	
+				}
+				
+				//var_dump($method);
+				
+				
+			}
+			
+			
+			
+			//return $this->authorizeRoute();
+		}
+		
+		
+				
+
+		/*
+		
+		if(!$isAuthenticated){
+			error_log("middleware: "."This is a ANONYMOUS USER.");
+			
+			// check for the anon scope.
+			if(!in_array('anon',$this->scopes)){
+				// Anonymous access is not allowed.
+				error_log("middleware: "."ANON NOT ALLOWED!");
+				#error_log("remember this url! ".$url_path);
+				#setcookie('last_url',$url_path,160);
+				
+				
+				
+				//$endpoint = "/signin?ref=https://accounts.trustmaster.nl/opmaak";
+				//$endpoint = "https://accounts.trustmaster.nl/authorize?response_type=code&client_id=".$cookieMan->client_id."&state=".time();//."&redirect_uri=".$redirectUrl;
+				// 
+				//error_log("Redirect to :".$endpoint);
+				//return $response->withRedirect($endpoint, 301);
+				
+			}else{
+				error_log("middleware: "."ANON IS ALLOWED!");
+				
+			}
+			
+		}
+		
+		
+		
+		
+		
+		
+		
+		if( !$this->cookieMan->verify() && $url_path!=$this->authorize_uri ){
+			// this is a unauthorized user on a endpoint with authorisation.
+			// lets check if 'anon' is allowed.
+			error_log("middleware: "."This is a ANONYMOUS USER.");
+			if(!in_array('anon',$this->scopes)){
+				// Anonymous access is not allowed.
+				error_log("middleware: "."ANON NOT ALLOWED!");
+				
+				
+				error_log("remember this url! ".$url_path);
+				setcookie('last_url',$url_path,160);
+				
+				
+				
+				//$endpoint = "/signin?ref=https://accounts.trustmaster.nl/opmaak";
+				$endpoint = "https://accounts.trustmaster.nl/authorize?response_type=code&client_id=".$cookieMan->client_id."&state=".time();//."&redirect_uri=".$redirectUrl;
+				// 
+				error_log("Redirect to :".$endpoint);
+				return $response->withRedirect($endpoint, 301);
+				
+			}else{
+				error_log("middleware: "."ANON IS ALLOWED!");
+				
+			}
+			
+		}
+		
+		
+		
+		
+		
+		
+		if( $url_path!=$this->callback_uri &&  $url_path!=$this->authorize_uri) {
+			error_log("middleware: "."We are at a normal url.");
+			
+			
+		}
+		
+		
+		
+		
+		
+		
+		error_log("------------------------------------------");
+		
+		error_log("middleware: ".$url_path);
+		error_log("cb uri:".$this->callback_uri);
+		error_log("auth uri:".$this->authorize_uri);
+		
+		echo "<pre>";
+		print_r($this->cookieMan->verify());
+		die();
+		
+		if( $url_path==$this->callback_uri ) {
+			error_log("middleware: "."We are at the CALLBACK URI");
+			
+		}
+		
+		if( $url_path==$this->authorize_uri){
+			error_log("middleware: "."We are at the AUTHORIZE URI");
+			
+			return $this->authorizeRoute();
+		}
+		
+		
+		
+		
+		//print_r($this->scopes);
+		
+		if( !$this->cookieMan->verify() && $url_path!=$this->authorize_uri ){
+			// this is a unauthorized user on a endpoint with authorisation.
+			// lets check if 'anon' is allowed.
+			error_log("middleware: "."This is a ANONYMOUS USER.");
+			if(!in_array('anon',$this->scopes)){
+				// Anonymous access is not allowed.
+				error_log("middleware: "."ANON NOT ALLOWED!");
+				
+				
+				error_log("remember this url! ".$url_path);
+				setcookie('last_url',$url_path,160);
+				
+				
+				
+				//$endpoint = "/signin?ref=https://accounts.trustmaster.nl/opmaak";
+				$endpoint = "https://accounts.trustmaster.nl/authorize?response_type=code&client_id=".$cookieMan->client_id."&state=".time();//."&redirect_uri=".$redirectUrl;
+				// 
+				error_log("Redirect to :".$endpoint);
+				return $response->withRedirect($endpoint, 301);
+				
+			}else{
+				error_log("middleware: "."ANON IS ALLOWED!");
+				
+			}
+			
+		}
+
+		
+		
+	
+		//die();
+		
+		//  check if url has ?code=
+		#$allGetVars = $request->getQueryParams();
 		
 		//Single GET parameter
 		//$code = $allGetVars['code'];
 		
 		
 		
-		
-		$cookieMan = new cookiemanager($this->server,$this->client_id,$this->client_secret,$this->jwt_public_key);
-		
-		#$r = $request->getUri()->getQuery();
-		$r = $request->getUri()->getPath();
-		
-		if( $r==$this->callback_uri){
-			//var_dump($r);
+		/*
+		# we are at the callback url.
+		// this is NOT NEEDED ON ACCOUNTS.TRUSTMASTER.nl
+		$url_path = $request->getUri()->getPath();
+		if( $url_path==$this->callback_uri){
+			// Check if code is supplied.
 			if(array_key_exists('code',$allGetVars)){
 				try{
-					$cookieMan->receiveAuthCode($allGetVars['code']);				
+					// a code is found, 
+					$cookieMan->receiveAuthCode($allGetVars['code']);
 				}catch(Exception $e){
 					var_dump($e->getMessage());
 					die($e->getMessage());			
 				}
 
+			}else{
+				// no code supplied, this is a invalid request.
 			}
+		}else{
+			#this is NOT the callbackurl.
+			error_log("this is NOT the callbackurl.");
 		}
+		
+		
 		
 		$redirect = false;
 		$authenticated = false;
@@ -82,12 +403,19 @@ class middleware {
 		
 		// verify the request
 		if(!$cookieMan->verify()){
+			error_log("cookieMan->verify() is FALSE");
 			//  anon, or invalid token.
 			//echo "anon, or invalid token.\n";
 			if(!in_array('anon',$this->scopes)){
+				error_log("Anonymous access is not allowed.  NOT IN SCOPES!");
 				// anon is not allowed, do something.
 				$redirect = true;
+				error_log("The requested url is : ".$cookieMan->requestedUrl);
 				$redirectUrl = $cookieMan->requestedUrl;
+				return $response->withRedirect("/signin?ref=".$redirectUrl, 301);
+				
+				
+				
 			}
 			
 		}else{
@@ -100,8 +428,8 @@ class middleware {
 			$cookieMan->payload->aud;
 			$cookieMan->payload->scope;
 			
-			$cookieMan->client_id="redacted";
-			$cookieMan->client_secret="redacted";
+			#$cookieMan->client_id="redacted";
+			#$cookieMan->client_secret="redacted";
 			
 			$cookieMan->refreshToken;
 			$cookieMan->accessToken;
@@ -121,6 +449,8 @@ class middleware {
 			
 		}
 		
+		
+		#die("_*_");
 		//print_r($cookieMan);
 		
 		#$container = $this->getContainer();
@@ -135,18 +465,23 @@ class middleware {
 		
 
 			
-		
+		#error_log($cookieMan->client_id." ".$endpoint);
 		
 		
 		if($redirect){
-			return $response->withRedirect($endpoint, 301);
+			//$endpoint = "/signin?ref=https://accounts.trustmaster.nl/opmaak";
+			#return $response->withRedirect($endpoint, 301);
+			#die($endpoint);
+			
 		}
 		
 		
 		#$response->getBody()->write(json_encode($this->payload) );
 		
-		#$response->getBody()->write('BEFORE');
-        $response = $next($request, $response);
+		//$response->getBody()->write('SUB: '.$cookieMan->payload->sub." client:".$cookieMan->client_id);
+        */
+		
+		$response = $next($request, $response);
 		//$response = $response->withHeader('Access-Control-Allow-Origin', '*');
 		
 		#$response->getBody()->write('AFTER');
