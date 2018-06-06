@@ -37,6 +37,33 @@ class middleware {
 		$this->authorize_uri 	=  $settings->idp_authorize_uri;
 		$this->callback_uri		=  $settings->local_callback_uri;
 		
+		if( isset($settings->facade)){
+			error_log("ARE YOU SURE THIS IS THE OAUTH FACADE?");
+			//echo "ARE YOU SURE THIS IS THE OAUTH FACADE?";
+		}
+		
+		if( isset($settings->facade->idp_server)){
+			$this->facade_idp_server = $settings->facade->idp_server;
+		}else{
+			$this->facade_idp_server = $settings->idp_server;
+		}
+		
+		if( isset($settings->facade->idp_token_uri)){
+			$this->facade_idp_token_uri = $settings->facade->idp_token_uri;
+		}else{
+			$this->facade_idp_token_uri = $settings->idp_token_uri;
+		}
+		
+		if( isset($settings->facade->idp_authorize_uri)){
+			$this->facade_idp_authorize_uri = $settings->facade->idp_authorize_uri;
+		}else{
+			$this->facade_idp_authorize_uri = $settings->idp_authorize_uri;
+		}
+		
+		
+		
+		#var_dump( isset($settings->facade->idp_servers));
+		#die();
 		
 		/*
 		$a['client_id'];
@@ -129,24 +156,25 @@ class middleware {
 		print_r($this->scopes);
 		echo "\n";
 
+		/************************************************************************
+		
+				Any url that needs AUTH, but not anonymous
+		
+		************************************************************************/
 		
 		if( !in_array('anon',$this->scopes) && !$isAuthenticated && $url_path!=$this->authorize_uri ){
 			// Anonymous access is not allowed.
 			// in a normal oauth situation we should be redirected to the authorisation endpoint.
 			error_log("middleware: "."ANON NOT ALLOWED!");
 			
-			if($isAuthenticated){
-				echo "You are authenticated!\n";
-			}else{
-				echo "You are NOT loggedin!\n";
-			}
 			
 			$redirectUrl = $_SERVER['SCRIPT_URI'];
+			
 			echo "PROTECTED URL : ".$redirectUrl."\n";
 			$_SESSION['lastUrl']= $redirectUrl;
 			
-			
-			$endpoint = "https://accounts.trustmaster.nl/authorize?response_type=code&client_id=".$this->client_id."&state=".time()."&redirect_uri=".$redirectUrl;
+			//https://accounts.trustmaster.nl
+			$endpoint = $this->facade_idp_token_uri."/authorize?response_type=code&client_id=".$this->client_id."&state=".time()."&redirect_uri=".$redirectUrl;
 			echo "REDIRECT:\n<a href='".$endpoint."'>".$endpoint."</a>";
 			die();
 			//return $response->withRedirect($endpoint, 302);
@@ -287,269 +315,14 @@ class middleware {
 				
 			}
 			
-			
-			
-			//return $this->authorizeRoute();
-		}
-		
-		
-				
 
-		/*
-		
-		if(!$isAuthenticated){
-			error_log("middleware: "."This is a ANONYMOUS USER.");
-			
-			// check for the anon scope.
-			if(!in_array('anon',$this->scopes)){
-				// Anonymous access is not allowed.
-				error_log("middleware: "."ANON NOT ALLOWED!");
-				#error_log("remember this url! ".$url_path);
-				#setcookie('last_url',$url_path,160);
-				
-				
-				
-				//$endpoint = "/signin?ref=https://accounts.trustmaster.nl/opmaak";
-				//$endpoint = "https://accounts.trustmaster.nl/authorize?response_type=code&client_id=".$cookieMan->client_id."&state=".time();//."&redirect_uri=".$redirectUrl;
-				// 
-				//error_log("Redirect to :".$endpoint);
-				//return $response->withRedirect($endpoint, 301);
-				
-			}else{
-				error_log("middleware: "."ANON IS ALLOWED!");
-				
-			}
-			
 		}
 		
-		
-		
-		
-		
-		
-		
-		if( !$this->cookieMan->verify() && $url_path!=$this->authorize_uri ){
-			// this is a unauthorized user on a endpoint with authorisation.
-			// lets check if 'anon' is allowed.
-			error_log("middleware: "."This is a ANONYMOUS USER.");
-			if(!in_array('anon',$this->scopes)){
-				// Anonymous access is not allowed.
-				error_log("middleware: "."ANON NOT ALLOWED!");
-				
-				
-				error_log("remember this url! ".$url_path);
-				setcookie('last_url',$url_path,160);
-				
-				
-				
-				//$endpoint = "/signin?ref=https://accounts.trustmaster.nl/opmaak";
-				$endpoint = "https://accounts.trustmaster.nl/authorize?response_type=code&client_id=".$cookieMan->client_id."&state=".time();//."&redirect_uri=".$redirectUrl;
-				// 
-				error_log("Redirect to :".$endpoint);
-				return $response->withRedirect($endpoint, 301);
-				
-			}else{
-				error_log("middleware: "."ANON IS ALLOWED!");
-				
-			}
-			
-		}
-		
-		
-		
-		
-		
-		
-		if( $url_path!=$this->callback_uri &&  $url_path!=$this->authorize_uri) {
-			error_log("middleware: "."We are at a normal url.");
-			
-			
-		}
-		
-		
-		
-		
-		
-		
-		error_log("------------------------------------------");
-		
-		error_log("middleware: ".$url_path);
-		error_log("cb uri:".$this->callback_uri);
-		error_log("auth uri:".$this->authorize_uri);
-		
-		echo "<pre>";
-		print_r($this->cookieMan->verify());
-		die();
-		
-		if( $url_path==$this->callback_uri ) {
-			error_log("middleware: "."We are at the CALLBACK URI");
-			
-		}
-		
-		if( $url_path==$this->authorize_uri){
-			error_log("middleware: "."We are at the AUTHORIZE URI");
-			
-			return $this->authorizeRoute();
-		}
-		
-		
-		
-		
-		//print_r($this->scopes);
-		
-		if( !$this->cookieMan->verify() && $url_path!=$this->authorize_uri ){
-			// this is a unauthorized user on a endpoint with authorisation.
-			// lets check if 'anon' is allowed.
-			error_log("middleware: "."This is a ANONYMOUS USER.");
-			if(!in_array('anon',$this->scopes)){
-				// Anonymous access is not allowed.
-				error_log("middleware: "."ANON NOT ALLOWED!");
-				
-				
-				error_log("remember this url! ".$url_path);
-				setcookie('last_url',$url_path,160);
-				
-				
-				
-				//$endpoint = "/signin?ref=https://accounts.trustmaster.nl/opmaak";
-				$endpoint = "https://accounts.trustmaster.nl/authorize?response_type=code&client_id=".$cookieMan->client_id."&state=".time();//."&redirect_uri=".$redirectUrl;
-				// 
-				error_log("Redirect to :".$endpoint);
-				return $response->withRedirect($endpoint, 301);
-				
-			}else{
-				error_log("middleware: "."ANON IS ALLOWED!");
-				
-			}
-			
-		}
-
-		
-		
-	
-		//die();
-		
-		//  check if url has ?code=
-		#$allGetVars = $request->getQueryParams();
-		
-		//Single GET parameter
-		//$code = $allGetVars['code'];
-		
-		
-		
-		/*
-		# we are at the callback url.
-		// this is NOT NEEDED ON ACCOUNTS.TRUSTMASTER.nl
-		$url_path = $request->getUri()->getPath();
-		if( $url_path==$this->callback_uri){
-			// Check if code is supplied.
-			if(array_key_exists('code',$allGetVars)){
-				try{
-					// a code is found, 
-					$cookieMan->receiveAuthCode($allGetVars['code']);
-				}catch(Exception $e){
-					var_dump($e->getMessage());
-					die($e->getMessage());			
-				}
-
-			}else{
-				// no code supplied, this is a invalid request.
-			}
-		}else{
-			#this is NOT the callbackurl.
-			error_log("this is NOT the callbackurl.");
-		}
-		
-		
-		
-		$redirect = false;
-		$authenticated = false;
-		
-		//echo "<pre>";
-		
-		// verify the request
-		if(!$cookieMan->verify()){
-			error_log("cookieMan->verify() is FALSE");
-			//  anon, or invalid token.
-			//echo "anon, or invalid token.\n";
-			if(!in_array('anon',$this->scopes)){
-				error_log("Anonymous access is not allowed.  NOT IN SCOPES!");
-				// anon is not allowed, do something.
-				$redirect = true;
-				error_log("The requested url is : ".$cookieMan->requestedUrl);
-				$redirectUrl = $cookieMan->requestedUrl;
-				return $response->withRedirect("/signin?ref=".$redirectUrl, 301);
-				
-				
-				
-			}
-			
-		}else{
-			// authenticated user details.
-			//echo "authenticated user details.\n";
-			
-			$authenticated =  true;
-			$cookieMan->payload->sub;
-			$cookieMan->payload->exp;
-			$cookieMan->payload->aud;
-			$cookieMan->payload->scope;
-			
-			#$cookieMan->client_id="redacted";
-			#$cookieMan->client_secret="redacted";
-			
-			$cookieMan->refreshToken;
-			$cookieMan->accessToken;
-			
-			
-			$rezz = array(	"refresh_token"=>$cookieMan->refreshToken,
-						  	"access_token"=>$cookieMan->accessToken,
-						  	"exp"=>$cookieMan->payload->exp,
-						  	"aud"=>$cookieMan->payload->aud,
-						  	"sub"=>$cookieMan->payload->sub,
-						  	"scope"=>$cookieMan->payload->scope
-						 );
-			
-			$this->setToken($rezz);
-			
-			//print_r($rezz);
-			
-		}
-		
-		
-		#die("_*_");
-		//print_r($cookieMan);
-		
-		#$container = $this->getContainer();
-		
-		#var_dump($container);
-		#print_r($this->scopes);
-		//$this->scopes;
-		#echo "</pre>";
-
-		$endpoint = "https://accounts.trustmaster.nl/authorize".
-		"?response_type=code&client_id=".$cookieMan->client_id."&state=".time();//."&redirect_uri=".$redirectUrl;
 		
 
-			
-		#error_log($cookieMan->client_id." ".$endpoint);
-		
-		
-		if($redirect){
-			//$endpoint = "/signin?ref=https://accounts.trustmaster.nl/opmaak";
-			#return $response->withRedirect($endpoint, 301);
-			#die($endpoint);
-			
-		}
-		
-		
-		#$response->getBody()->write(json_encode($this->payload) );
-		
-		//$response->getBody()->write('SUB: '.$cookieMan->payload->sub." client:".$cookieMan->client_id);
-        */
 		
 		$response = $next($request, $response);
 		//$response = $response->withHeader('Access-Control-Allow-Origin', '*');
-		
 		#$response->getBody()->write('AFTER');
 
 		
