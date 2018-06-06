@@ -20,7 +20,7 @@ class middleware {
 	var $callback_uri = "/callback";  // /callback
 	var $token_uri    = "/token";  // /callback
 	
-	var $client_id;		//
+	var $client_id;		// **
 	var $client_secret;	//
 	var $jwt_public_key;// /somelocation/pub.key
 	
