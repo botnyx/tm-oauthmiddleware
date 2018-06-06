@@ -15,9 +15,10 @@ use Slim\Http\Response;
 class middleware {
     
 	var $server; 		// http://idp.trustmaster.nl
+	
 	var $authorize_uri= '/authorize';	// /authorize
 	var $callback_uri = "/callback";  // /callback
-	
+	var $token_uri    = "/token";  // /callback
 	
 	var $client_id;		//
 	var $client_secret;	//
@@ -25,12 +26,32 @@ class middleware {
 	
 	var $callback;
 	
-	function __construct($server,$clientid,$clientsecret,$jwt_public_key,$container){
+	function __construct($settings,$container){
 		
-		$this->server	=$server;
-		$this->client_id=$clientid;
-		$this->client_secret=$clientsecret;
-		$this->jwt_public_key=$jwt_public_key;
+		$this->server 			=  $settings->idp_server;
+		$this->client_id 		=  $settings->idp_clientid;
+		$this->client_secret	=  $settings->idp_clientsecret;
+		$this->jwt_public_key 	=  $settings->idp_public_key;
+		
+		$this->token_uri 		=  $settings->idp_token_uri;
+		$this->authorize_uri 	=  $settings->idp_authorize_uri;
+		$this->callback_uri		=  $settings->local_callback_uri;
+		
+		
+		/*
+		$a['client_id'];
+		$a['client_secret'];
+		$a['jwt_public_key'];
+		$a['idp_server'];
+		$a['authorize_uri'];
+		$a['callback_uri'];
+		$a['token_uri'];
+		*/
+		
+		#$this->server	=$server;
+		#$this->client_id=$clientid;
+		#$this->client_secret=$clientsecret;
+		#$this->jwt_public_key=$jwt_public_key;
 		
 		$this->container = $this->validateContainer($container);
 		
@@ -52,20 +73,56 @@ class middleware {
      */
     public function __invoke($request, $response, $next)
     {
-        
-		$allGetVars = $request->getQueryParams();
+        // 
+		$allGetVars 	= $request->getQueryParams();
 		$allPostPutVars = $request->getParsedBody();
-		$allUrlVars = $request->getQueryParams();
+		$allUrlVars 	= $request->getQueryParams();
 		
+		//
+		$url_path 	= $request->getUri()->getPath();
+		$method 	= $request->getMethod();
 		
-		$url_path = $request->getUri()->getPath();
-		$method = $request->getMethod();
-			
-		
+		//
 		$isAuthenticated = $this->cookieMan->verify();
 		
 		
+		
+		/************************************************************************
+		
+				CALLBACK URL
+		
+		************************************************************************/
+		if( $url_path==$this->callback){
+			// This is the Callback URI. 
+			if(array_key_exists('code',$allGetVars)){
+				try{
+					// a code is found, 
+					$cookieMan->receiveAuthCode($allGetVars['code']);
+				}catch(Exception $e){
+					var_dump($e->getMessage());
+					die($e->getMessage());			
+				}
 
+			}else{
+				// no code supplied, this is a invalid request.
+			}
+			//print_r($cookieMan);
+			//die();
+			//$response = $next($request, $response);
+			return $response;
+		}
+
+		
+		/***********************************************************************
+		
+				TOKEN URL
+		
+		************************************************************************/
+		if( $url_path==$this->token_uri){
+			// This is the Token URI. we proxy this request to our internal IDP.
+			$response = $next($request, $response);
+			return $response;
+		}
 		
 		
 		echo "<pre>This page (".$_SERVER['SCRIPT_URI'].") needs at least one of these scopes.\n";
@@ -96,12 +153,18 @@ class middleware {
 		}
 		
 		
-		// Authorize URL
-		if( $url_path==$this->authorize_uri){
+		/************************************************************************
+		
+				AUTHORIZE URL
+		
+		************************************************************************/
+		if( $url_path==$this->authorize_uri)
+		{
 			echo "middleware: "."We are at the AUTHORIZE URI\n";
 			$authorizeRoute = new \botnyx\tmoauthmiddleware\authorize($request);
 			
-			echo "Referred via :".$_SESSION['lastUrl']."\n";
+			
+			echo "Referred via :".$allGetVars['redirect_uri']."\n";
 			
 			
 			$idp = new \botnyx\tmidpconn\idpconn($this->server,$this->client_id,$this->client_secret);
@@ -115,7 +178,7 @@ class middleware {
 					echo "present Grant Auth screen\n";
 					return $this->container['view']->render($response, 'base-layout.phtml', [
 						'screen' => 'authorize',
-						'data'=>array('client_id'=>$this->client_id),
+						'data'=>array('client_id'=>$allGetVars['client_id']),
 						'error'=>''
 					]);	
 				}else{
@@ -127,7 +190,7 @@ class middleware {
 					#print_r($this->cookieMan);
 					#$this->cookieMan->payload->aud
 					
-					$R = $idp->receiveAuthCode(strtolower($allPostPutVars['authorized']),$this->cookieMan->payload->aud,$this->cookieMan->payload->sub);
+					$R = $idp->receiveAuthCode(strtolower($allPostPutVars['authorized']),$allGetVars['client_id'],$this->cookieMan->payload->sub);
 					
 					
 					if($R['code']==302){
@@ -142,7 +205,7 @@ class middleware {
 						parse_str($parsedUrl['query'], $idp_response);
 						var_dump($idp_response);
 						
-						$uri = $R['data']['url']."&redirect_uri=".$_SESSION['lastUrl'];
+						$uri = $R['data']['url']."&redirect_uri=".$allGetVars['redirect_uri'];
 						
 						
 						echo "<a href='$uri'>REDIR!</a>";
@@ -171,7 +234,10 @@ class middleware {
 				
 				
 
-			}else{
+			
+			}
+			else
+			{
 				echo "You are NOT loggedin!\n";
 				echo "present LOGIN screen\n";
 				echo $method."\n";
